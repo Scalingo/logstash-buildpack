@@ -3,4 +3,4 @@
 curl https://artifacts.elastic.co/downloads/logstash/logstash-5.5.0.tar.gz -L --silent -o /tmp/logstash.tar.gz
 
 mkdir -p $1/logstash
-tar -xvf /tmp/logstash.tar.gz -C $1/logstash
+tar -xf /tmp/logstash.tar.gz -C $1/logstash
