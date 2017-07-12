@@ -1,0 +1,5 @@
+#!/bin/bash
+
+curl https://artifacts.elastic.co/downloads/logstash/logstash-5.5.0.tar.gz -L --silent -o /tmp/logstash.tar.gz
+
+tar -xvf /tmp/logstash.tar.gz -C $0/logstash
