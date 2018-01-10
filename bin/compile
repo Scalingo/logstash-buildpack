@@ -1,6 +1,26 @@
 #!/bin/bash
 
-curl https://artifacts.elastic.co/downloads/logstash/logstash-5.5.0.tar.gz -L --silent -o /tmp/logstash.tar.gz
+i() {
+  sed 's/^/       /'
+}
 
+LOGSTASH_VERSION=${LOGSTASH_VERSION:-5.5.0}
+
+echo "Downloading logstash version $LOGSTASH_VERSION" | i
+
+curl https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz -L --silent -o /tmp/logstash.tar.gz
+
+echo "Extracting logstash" | i
 mkdir -p $1/logstash
 tar -xf /tmp/logstash.tar.gz -C $1/logstash
+
+echo "Installing plugins" | i
+
+cd $1/logstash/logstash-$LOGSTASH_VERSION
+
+for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
+  echo "Installing plugin $plugin" | i
+  bin/logstash-plugin install $plugin | i
+done
+
+echo "Done" | i
