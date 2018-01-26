@@ -6,6 +6,8 @@ i() {
 
 LOGSTASH_VERSION=${LOGSTASH_VERSION:-5.5.0}
 
+BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
+
 echo "Downloading logstash version $LOGSTASH_VERSION" | i
 
 curl https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz -L --silent -o /tmp/logstash.tar.gz
@@ -22,5 +24,8 @@ for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
   echo "Installing plugin $plugin" | i
   bin/logstash-plugin install $plugin | i
 done
+
+mkdir -p $1/bin
+cp $BUILDPACK_PATH/lib/logstash $1/bin/logstash
 
 echo "Done" | i
