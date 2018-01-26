@@ -26,6 +26,6 @@ for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
 done
 
 mkdir -p $1/bin
-cp $BUILDPACK_PATH/lib/logstash $1/bin/logstash
+cp $BUILDPACK_PATH/bin/logstash $1/bin/logstash
 
 echo "Done" | i

@@ -27,8 +27,8 @@ The elasticsearch binary will be available at
 You can also use the wrapper present in this buildpack which will do two
 things:
 * Use the `LOGSTASH_VERSION` environment variable to generate the path
-* Split the `ELASTICSEARCh_URL` variable into three:
-  * `ELASTICSEARCh_HOST`
-  * `ELASTICSEARCh_USER`
-  * `ELASTICSEARCh_PASSWORD`
+* Split the `ELASTICSEARCH_URL` variable into three:
+  * `ELASTICSEARCH_HOST`
+  * `ELASTICSEARCH_USER`
+  * `ELASTICSEARCH_PASSWORD`
 
