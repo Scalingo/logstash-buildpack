@@ -4,11 +4,11 @@ i() {
   sed 's/^/       /'
 }
 
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-5.5.0}
+LOGSTASH_VERSION=${LOGSTASH_VERSION:-6.8.5}
 
 BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
-echo "Downloading logstash version $LOGSTASH_VERSION" | i
+echo "Downloading Logstash version $LOGSTASH_VERSION" | i
 
 curl https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz -L --silent -o /tmp/logstash.tar.gz
 
