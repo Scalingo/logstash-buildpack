@@ -8,4 +8,8 @@ export ELASTICSEARCH_HOST=$url
 export ELASTICSEARCH_USER=$user
 export ELASTICSEARCH_PASSWORD=$pass
 
+export LS_JAVA_OPTS="$JAVA_OPTS"
+unset JAVA_OPTS
+unset JAVA_TOOL_OPTIONS
+
 $APP_PATH/logstash/logstash-$LOGSTASH_VERSION/bin/logstash $*
