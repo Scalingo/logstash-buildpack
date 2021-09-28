@@ -1,6 +1,8 @@
 #!/bin/bash
 
-i() {
+BUILD_DIR=$1
+
+indent() {
   sed 's/^/       /'
 }
 
@@ -8,24 +10,24 @@ LOGSTASH_VERSION=${LOGSTASH_VERSION:-6.8.5}
 
 BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
-echo "Downloading Logstash version $LOGSTASH_VERSION" | i
+echo "Downloading Logstash version $LOGSTASH_VERSION" | indent
 
 curl https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz -L --silent -o /tmp/logstash.tar.gz
 
-echo "Extracting logstash" | i
-mkdir -p $1/logstash
-tar -xf /tmp/logstash.tar.gz -C $1/logstash
+echo "Extracting logstash" | indent
+mkdir -p $BUILD_DIR/logstash
+tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR/logstash
 
-echo "Installing plugins" | i
+echo "Installing plugins" | indent
 
-cd $1/logstash/logstash-$LOGSTASH_VERSION
+cd $BUILD_DIR/logstash/logstash-$LOGSTASH_VERSION
 
 for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
-  echo "Installing plugin $plugin" | i
-  bin/logstash-plugin install $plugin | i
+  echo "Installing plugin $plugin" | indent
+  bin/logstash-plugin install $plugin | indent
 done
 
-mkdir -p $1/bin
-cp $BUILDPACK_PATH/bin/logstash $1/bin/logstash
+mkdir -p $BUILD_DIR/bin
+cp $BUILDPACK_PATH/bin/logstash $BUILD_DIR/bin/logstash
 
-echo "Done" | i
+echo "Done" | indent
