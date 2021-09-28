@@ -8,7 +8,19 @@ export ELASTICSEARCH_HOST=$url
 export ELASTICSEARCH_USER=$user
 export ELASTICSEARCH_PASSWORD=$pass
 
-export LS_JAVA_OPTS="$JAVA_OPTS"
+## Allow the ability to verride
+if [ -d "$APP_PATH/config" ] ; then
+  cp $APP_PATH/config/* "${APP_PATH}/logstash/logstash-${LOGSTASH_VERSION}/config"
+fi
+
+if echo "${JAVA_OPTS:-}" | grep -q "\-Xms"; then
+  export LS_JAVA_OPTS="$JAVA_OPTS"
+else
+  # Start with a small heap is ok and then it will grow until the dynamic Xmx
+  # from the java buildpack. Logstash fails to start if -Xmx is set and not -Xms
+  export LS_JAVA_OPTS="-Xms128m $JAVA_OPTS"
+fi
+
 unset JAVA_OPTS
 unset JAVA_TOOL_OPTIONS
 
