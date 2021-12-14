@@ -6,6 +6,8 @@ This buildpack manage the installation of
 It has been designed to work on [Scalingo](https://scalingo.com/), but it should
 work on any other platform that support buildpacks.
 
+Default version: 6.8.21
+
 Please follow our [documentation
 page](https://doc.scalingo.com/platform/getting-started/getting-started-with-elk#logstash)
 about the ELK stack to use this buildpack.
@@ -19,7 +21,6 @@ This buildpack assume that java is already installed with the correct version.
 To configure the buildpack you can use the following environment variables:
 
 * `LOGSTASH_VERSION`: Define which version of Logstash will be installed
-  (defaults to: 6.8.5)
 * `LOGSTASH_PLUGINS`: Comma separated list of plugins which needs to be
   installed. [List of plugins](https://github.com/logstash-plugins)
 
