@@ -1,0 +1,8 @@
+version = "1.0.0"
+owner = "etienne@scalingo.com"
+team = "IST"
+description = "This buildpack manages the installation of Logstash"
+languages = ["shell"]
+destination_server = []
+flags = ["buildpack"]
+dependencies = []
