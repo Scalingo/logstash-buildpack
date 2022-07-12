@@ -12,7 +12,13 @@ BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
 echo "Downloading Logstash version $LOGSTASH_VERSION" | indent
 
-curl https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION-linux-x86_64.tar.gz -L --silent -o /tmp/logstash.tar.gz
+if [ "$LOGSTASH_VERSION" = "6" ]
+then
+  URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz
+else
+  URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION-linux-x86_64.tar.gz
+fi
+curl $URL -L --silent -o /tmp/logstash.tar.gz
 
 echo "Extracting logstash" | indent
 mkdir -p $BUILD_DIR/logstash
