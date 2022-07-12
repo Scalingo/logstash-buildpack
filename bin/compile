@@ -12,7 +12,7 @@ BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
 echo "Downloading Logstash version $LOGSTASH_VERSION" | indent
 
-if [ "$LOGSTASH_VERSION" = "6" ]
+if [ ${LOGSTASH_VERSION:0:1} = "6" ]
 then
   URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz
 else
