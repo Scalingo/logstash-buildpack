@@ -21,14 +21,12 @@ fi
 curl $URL -L --silent -o /tmp/logstash.tar.gz
 
 echo "Extracting logstash" | indent
-mkdir -p $BUILD_DIR/logstash
 tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
 
-mkdir --parents "${BUILD_DIR}/logstash"
 mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
-
 rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
-rmdir "${BUILD_DIR}/logstash"
+
+export PATH="${PATH}:${BUILD_DIR}/bin"
 
 echo "Installing plugins" | indent
 
