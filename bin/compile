@@ -6,7 +6,7 @@ indent() {
   sed 's/^/       /'
 }
 
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-6.8.21}
+LOGSTASH_VERSION=${LOGSTASH_VERSION:-9.0.1}
 
 BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
@@ -22,18 +22,22 @@ curl $URL -L --silent -o /tmp/logstash.tar.gz
 
 echo "Extracting logstash" | indent
 mkdir -p $BUILD_DIR/logstash
-tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR/logstash
+tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
+
+mkdir --parents "${BUILD_DIR}/logstash"
+mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
+
+rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
+rmdir "${BUILD_DIR}/logstash"
 
 echo "Installing plugins" | indent
-
-cd $BUILD_DIR/logstash/logstash-$LOGSTASH_VERSION
 
 for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
   echo "Installing plugin $plugin" | indent
   bin/logstash-plugin install $plugin | indent
 done
 
-mkdir -p $BUILD_DIR/bin
-cp $BUILDPACK_PATH/bin/logstash $BUILD_DIR/bin/logstash
+# mkdir -p $BUILD_DIR/bin
+# cp $BUILDPACK_PATH/bin/logstash $BUILD_DIR/bin/logstash
 
 echo "Done" | indent

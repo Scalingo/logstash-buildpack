@@ -1,2 +1,10 @@
 #!/bin/bash
 
+cat << EOF
+---
+config_vars:
+  JAVA_HOME: "/app/jdk"
+  PATH: "/app/bin:/usr/local/bin:/usr/bin:/bin"
+default_process_types:
+  web: printenv && logstash -f logstash.conf
+EOF
