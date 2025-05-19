@@ -23,13 +23,17 @@ curl $URL -L --silent -o /tmp/logstash.tar.gz
 echo "Extracting logstash" | indent
 tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
 
-mv "${BUILD_DIR}/config" "${BUILD_DIR}/user_config"
+if [ -d "${BUILD_DIR}/config" ]; then
+	mv "${BUILD_DIR}/config" "${BUILD_DIR}/user_config" 2> /dev/null
+fi
 
 mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
 rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
 
-mv "${BUILD_DIR}/user_config/"* "${BUILD_DIR}/config/"
-rmdir "${BUILD_DIR}/usr_config"
+if [ -d "${BUILD_DIR}/user_config" ]; then
+	mv "${BUILD_DIR}/user_config/"* "${BUILD_DIR}/config/" 2> /dev/null
+	rmdir "${BUILD_DIR}/user_config" 2> /dev/null
+fi
 
 export PATH="${PATH}:${BUILD_DIR}/bin"
 
