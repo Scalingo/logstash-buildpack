@@ -21,7 +21,7 @@ fi
 curl $URL -L --silent -o /tmp/logstash.tar.gz
 
 echo "Extracting logstash" | indent
-tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR/logstash
+tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
 
 # Put user-provided config files aside:
 if [ -d "${BUILD_DIR}/config" ]; then
