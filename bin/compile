@@ -43,14 +43,13 @@ export PATH="${PATH}:${BUILD_DIR}/bin"
 
 echo "Installing plugins" | indent
 
-cd $BUILD_DIR/logstash/logstash-$LOGSTASH_VERSION
+# Always install logstash-output-opensearch
+bin/logstash-plugin-install "logstash-output-opensearch"
 
+# Install other plugins:
 for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
   echo "Installing plugin $plugin" | indent
   bin/logstash-plugin install $plugin | indent
 done
-
-mkdir -p $BUILD_DIR/bin
-cp $BUILDPACK_PATH/bin/logstash $BUILD_DIR/bin/logstash
 
 echo "Done" | indent
