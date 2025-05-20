@@ -21,8 +21,25 @@ fi
 curl $URL -L --silent -o /tmp/logstash.tar.gz
 
 echo "Extracting logstash" | indent
-mkdir -p $BUILD_DIR/logstash
 tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR/logstash
+
+# Put user-provided config files aside:
+if [ -d "${BUILD_DIR}/config" ]; then
+  mv "${BUILD_DIR}/config" "${BUILD_DIR}/user_config" 2> /dev/null
+fi
+
+# Copy default config files:
+mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
+rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
+
+# Put back user-provided config:
+if [ -d "${BUILD_DIR}/user_config" ]; then
+  mv "${BUILD_DIR}/user_config/"* "${BUILD_DIR}/config/" 2> /dev/null
+  rmdir "${BUILD_DIR}/user_config" 2> /dev/null
+fi
+
+export PATH="${PATH}:${BUILD_DIR}/bin"
+
 
 echo "Installing plugins" | indent
 
