@@ -6,7 +6,7 @@ indent() {
   sed 's/^/       /'
 }
 
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-6.8.21}
+LOGSTASH_VERSION=${LOGSTASH_VERSION:-9.0.1}
 
 BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
