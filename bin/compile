@@ -6,7 +6,7 @@ indent() {
   sed 's/^/       /'
 }
 
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-6.8.21}
+LOGSTASH_VERSION=${LOGSTASH_VERSION:-9.0.1}
 
 BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
 
@@ -16,24 +16,41 @@ if [ ${LOGSTASH_VERSION:0:1} = "6" ]
 then
   URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz
 else
-  URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION-linux-x86_64.tar.gz
+  URL=https://artifacts.elastic.co/downloads/logstash/logstash-oss-$LOGSTASH_VERSION-linux-x86_64.tar.gz
 fi
 curl $URL -L --silent -o /tmp/logstash.tar.gz
 
 echo "Extracting logstash" | indent
-mkdir -p $BUILD_DIR/logstash
-tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR/logstash
+tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
+
+# Put user-provided config files aside:
+if [ -d "${BUILD_DIR}/config" ]; then
+  mv "${BUILD_DIR}/config" "${BUILD_DIR}/user_config" 2> /dev/null
+fi
+
+# Copy default config files:
+mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
+rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
+
+# Put back user-provided config:
+if [ -d "${BUILD_DIR}/user_config" ]; then
+  mv "${BUILD_DIR}/user_config/"* "${BUILD_DIR}/config/" 2> /dev/null
+  rmdir "${BUILD_DIR}/user_config" 2> /dev/null
+fi
+
+export PATH="${PATH}:${BUILD_DIR}/bin"
+
 
 echo "Installing plugins" | indent
 
-cd $BUILD_DIR/logstash/logstash-$LOGSTASH_VERSION
+# Always install logstash-output-opensearch
+echo "Installing plugin logstash-output-opensearch" | indent
+bin/logstash-plugin install "logstash-output-opensearch"
 
+# Install other plugins:
 for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
   echo "Installing plugin $plugin" | indent
-  bin/logstash-plugin install $plugin | indent
+  bin/logstash-plugin install "${plugin}" | indent
 done
-
-mkdir -p $BUILD_DIR/bin
-cp $BUILDPACK_PATH/bin/logstash $BUILD_DIR/bin/logstash
 
 echo "Done" | indent
