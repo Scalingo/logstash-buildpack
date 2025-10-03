@@ -45,12 +45,12 @@ echo "Installing plugins" | indent
 
 # Always install logstash-output-opensearch
 echo "Installing plugin logstash-output-opensearch" | indent
-bin/logstash-plugin install "logstash-output-opensearch"
+logstash-plugin install "logstash-output-opensearch"
 
 # Install other plugins:
 for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
   echo "Installing plugin $plugin" | indent
-  bin/logstash-plugin install "${plugin}" | indent
+  logstash-plugin install "${plugin}" | indent
 done
 
 echo "Done" | indent
