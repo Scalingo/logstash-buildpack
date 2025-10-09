@@ -1,50 +1,193 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
-BUILD_DIR=$1
+cmnlib_url="https://github.com/Scalingo/cmnlib/raw/refs/tags/<version>/cmnlib.sh"
 
-indent() {
-  sed 's/^/       /'
-}
+#if ! declare -F cmn::output::info >/dev/null; then
+#	source /dev/stdin <<< \
+#		"$( curl --silent --location --retry 3 "${cmnlib_url}" \
+#		|| printf "echo ' 🗙 Unable to load cmnlib, aborting.' >&2 && exit 1"; )"
+#fi
 
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-9.0.1}
+# shellcheck disable=SC1091
+source "$( cd -P "$( dirname "${0}" )" && pwd )/../cmnlib.sh"
 
-BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
+cmn::main::start "${0}" "${1}" "${2}" "${3}"
 
-echo "Downloading Logstash version $LOGSTASH_VERSION" | indent
+# -----------------------------------------------------------------------------
 
-if [ ${LOGSTASH_VERSION:0:1} = "6" ]
-then
-  URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz
+# shellcheck disable=SC1091
+source "${buildpack_dir}/VERSIONS"
+version="${LOGSTASH_VERSION:-"${LOGSTASH_DEFAULT_VERSION}"}"
+
+archive="logstash-${version}.tar.gz"
+
+file_url="https://artifacts.elastic.co/downloads/logstash/logstash-oss-${version}-linux-x86_64.tar.gz"
+if [ "${version:0:1}" == "6" ]; then
+	file_url="https://artifacts.elastic.co/downloads/logstash/logstash-${version}.tar.gz"
+fi
+
+hash_url="${file_url}.sha512"
+
+cache_file="${cache_dir}/${archive}"
+hash_file="${cache_file}.sha512"
+
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Installing Logstash ${version}"
+
+# Download hash file:
+cmn::task::start "Downloading checksum"
+# Remove previous hash files:
+rm --recursive --force "${cache_dir}"/*.tar.gz.sha512
+
+if ! cmn::file::download "${hash_url}" "${hash_file}"; then
+	cmn::task::fail
+	cmn::step::fail
+	exit 10
+fi
+cmn::task::finish
+
+cmn::output::debug "$( cat "${hash_file}" )"
+
+if [ ! -f "${cache_file}" ]; then
+	# Remove archive from cache, since they are probably for another version:
+	cmn::task::start "Cleaning cache"
+	rm --recursive --force "${cache_dir}"/*.tar.gz
+	cmn::task::finish
+
+	# Download appropriate version:
+	cmn::task::start "Downloading archive"
+	if ! cmn::file::download "${file_url}" "${cache_file}"; then
+		cmn::task::fail
+		cmn::step::fail
+		exit 11
+	fi
+	cmn::task::finish
 else
-  URL=https://artifacts.elastic.co/downloads/logstash/logstash-oss-$LOGSTASH_VERSION-linux-x86_64.tar.gz
-fi
-curl $URL -L --silent -o /tmp/logstash.tar.gz
-
-echo "Extracting logstash" | indent
-tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
-
-if [ -d "${BUILD_DIR}/config" ]; then
-	mv "${BUILD_DIR}/config" "${BUILD_DIR}/user_config" 2> /dev/null
+	cmn::output::info "Found matching file in cache."
 fi
 
-mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
-rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
+cmn::task::start "Checking archive validity"
+if ! cmn::file::check_checksum "${cache_file}" "${hash_file}"; then
+	cmn::task::fail
+	cmn::output::err <<- EOM
+		Unable to check archive validity.
+		I'm now removing the file from the cache to force
+		a new download during the next deployment attempt.
+	EOM
 
-if [ -d "${BUILD_DIR}/user_config" ]; then
-	mv "${BUILD_DIR}/user_config/"* "${BUILD_DIR}/config/" 2> /dev/null
-	rmdir "${BUILD_DIR}/user_config" 2> /dev/null
+	# File in cache does not seem valid,
+	# remove it so a future run can be successful
+	rm --force "${cache_file}"
+	rm --force "${hash_file}"
+	cmn::step::fail
+	exit 12
+fi
+cmn::task::finish
+
+# From this point we have a valid file in cache.
+
+cmn::task::start "Extracting"
+if ! tar --extract --file="${cache_file}" --directory="${build_dir}" \
+	2>/dev/null
+then
+	cmn::task::fail
+	cmn::step::fail
+	exit 13
+fi
+cmn::task::finish
+
+cmn::task::start "Configuring"
+# Put user-provided config aside:
+if [ -d "${build_dir}/config" ]; then
+	if ! mv "${build_dir}/config" "${build_dir}/user_config" 2>/dev/null; then
+		cmn::task::fail
+		cmn::step::fail
+		exit 14
+	fi
 fi
 
-export PATH="${PATH}:${BUILD_DIR}/bin"
+# Copy default config:
+if ! mv "${build_dir}/logstash-${version}/"* "${build_dir}/"; then
+	cmn::task::fail
+	cmn::step::fail
+	exit 15
+fi
 
-echo "Installing plugins" | indent
+if ! rmdir "${build_dir}/logstash-${version}"; then
+	cmn::task::fail
+	cmn::step::fail
+	exit 16
+fi
 
-for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
-  echo "Installing plugin $plugin" | indent
-  bin/logstash-plugin install $plugin | indent
+# Put user-provided config back in place:
+if [ -d "${build_dir}/user_config" ]; then
+	if ! mv "${build_dir}/user_config/"* "${build_dir}/config/" 2>/dev/null
+	then
+		cmn::task::fail
+		cmn::step::fail
+		exit 17
+	fi
+
+	# Don't exit if this one fails:
+	rmdir "${build_dir}/user_config" 2>/dev/null
+fi
+
+cmn::step::finish
+
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Building Environment"
+
+export PATH="${build_dir}/bin:${PATH}"
+
+cmn::step::finish
+
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Installing Plugins"
+# Make sure LOGSTASH_PLUGINS is defined:
+LOGSTASH_PLUGINS="${LOGSTASH_PLUGINS:-""}"
+
+# Replace ',' with ' ':
+plugins="${LOGSTASH_PLUGINS//,/ }"
+
+# Make sure "logstash-output-opensearch" is installed:
+cmn::task::start "Installing plugin logstash-output-opensearch"
+if ! logstash-plugin install "logstash-output-opensearch" >/dev/null 2>&1
+then
+	cmn::task::fail
+	cmn::step::fail
+	exit 20
+fi
+cmn::task::finish
+
+# (! Don't quote $plugins)
+for plugin in ${plugins}; do
+	if [ "${plugin}" != "logstash-output-opensearch" ]; then
+		cmn::task::start "Installing plugin ${plugin}"
+		if ! logstash-plugin install "${plugin}" >/dev/null 2>&1
+		then
+			cmn::task::fail
+			cmn::step::fail
+			exit 21
+		fi
+		cmn::task::finish
+	fi
 done
 
-# mkdir -p $BUILD_DIR/bin
-# cp $BUILDPACK_PATH/bin/logstash $BUILD_DIR/bin/logstash
+cmn::step::finish
 
-echo "Done" | indent
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Cleaning up"
+
+cmn::task::start "Removing temporary files"
+rm --recursive --force "${tmp_dir}"
+cmn::task::finish
+
+cmn::step::finish
+
+
+cmn::main::finish
