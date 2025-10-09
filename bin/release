@@ -3,7 +3,7 @@
 cat << EOF
 ---
 config_vars:
-  PATH: "${HOME}/bin:/usr/local/bin:/usr/bin:/bin"
+  PATH: "/app/bin:/usr/local/bin:/usr/bin:/bin"
 default_process_types:
-  web: ${HOME}/bin/logstash -f logstash.conf
+  web: /app/bin/logstash -f logstash.conf
 EOF

@@ -133,6 +133,7 @@ if [ -d "${build_dir}/user_config" ]; then
 	# Don't exit if this one fails:
 	rmdir "${build_dir}/user_config" 2>/dev/null
 fi
+cmn::task::finish
 
 cmn::step::finish
 
