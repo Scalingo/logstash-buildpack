@@ -41,8 +41,6 @@ if ! cmn::file::download "${hash_url}" "${hash_file}"; then
 fi
 cmn::task::finish
 
-cmn::output::debug "$( cat "${hash_file}" )"
-
 if [ ! -f "${cache_file}" ]; then
 	# Remove archive from cache, since they are probably for another version:
 	cmn::task::start "Cleaning cache"
