@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 # usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
-cmnlib_url="https://github.com/Scalingo/cmnlib/raw/refs/tags/<version>/cmnlib.sh"
-
-#if ! declare -F cmn::output::info >/dev/null; then
-#	source /dev/stdin <<< \
-#		"$( curl --silent --location --retry 3 "${cmnlib_url}" \
-#		|| printf "echo ' 🗙 Unable to load cmnlib, aborting.' >&2 && exit 1"; )"
-#fi
-
+# Don't try to shellcheck cmnlib.sh
 # shellcheck disable=SC1091
 source "$( cd -P "$( dirname "${0}" )" && pwd )/../cmnlib.sh"
 
