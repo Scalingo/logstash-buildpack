@@ -92,6 +92,15 @@ fi
 cmn::task::finish
 
 cmn::task::start "Configuring"
+# Users can provide their own configuration files in the `config` directory.
+# But we also want to bring our defaults!
+# Simply copying our files in the `config` directory could overwrite the
+# user-provided config, and that's not what we want.
+# Consequently, user-provided files must first be put aside, so we can copy
+# ours.
+# The user-provided files are then copied back, which makes sure user-provided
+# config takes precedence over our defaults.
+
 # Put user-provided config aside:
 if [ -d "${build_dir}/config" ]; then
 	if ! mv "${build_dir}/config" "${build_dir}/user_config" 2>/dev/null; then
