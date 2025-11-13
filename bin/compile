@@ -10,7 +10,7 @@ cmn::main::start "${0}" "${1}" "${2}" "${3}"
 # -----------------------------------------------------------------------------
 
 # shellcheck disable=SC1091
-source "${buildpack_dir}/VERSIONS"
+source "${buildpack_dir:?}/VERSIONS"
 version="${LOGSTASH_VERSION:-"${LOGSTASH_DEFAULT_VERSION}"}"
 
 archive="logstash-${version}.tar.gz"
@@ -22,7 +22,7 @@ fi
 
 hash_url="${file_url}.sha512"
 
-cache_file="${cache_dir}/${archive}"
+cache_file="${cache_dir:?}/${archive}"
 hash_file="${cache_file}.sha512"
 
 # -----------------------------------------------------------------------------
@@ -32,7 +32,7 @@ cmn::step::start "Installing Logstash ${version}"
 # Download hash file:
 cmn::task::start "Downloading checksum"
 # Remove previous hash files:
-rm --recursive --force "${cache_dir}"/*.tar.gz.sha512
+rm --recursive --force "${cache_dir:?}"/*.tar.gz.sha512
 
 if ! cmn::file::download "${hash_url}" "${hash_file}"; then
 	cmn::task::fail
@@ -44,7 +44,7 @@ cmn::task::finish
 if [ ! -f "${cache_file}" ]; then
 	# Remove archive from cache, since they are probably for another version:
 	cmn::task::start "Cleaning cache"
-	rm --recursive --force "${cache_dir}"/*.tar.gz
+	rm --recursive --force "${cache_dir:?}"/*.tar.gz
 	cmn::task::finish
 
 	# Download appropriate version:
@@ -80,7 +80,7 @@ cmn::task::finish
 # From this point we have a valid file in cache.
 
 cmn::task::start "Extracting"
-if ! tar --extract --file="${cache_file}" --directory="${build_dir}" \
+if ! tar --extract --file="${cache_file}" --directory="${build_dir:?}" \
 	2>/dev/null
 then
 	cmn::task::fail
@@ -100,8 +100,8 @@ cmn::task::start "Configuring"
 # config takes precedence over our defaults.
 
 # Put user-provided config aside:
-if [ -d "${build_dir}/config" ]; then
-	if ! mv "${build_dir}/config" "${build_dir}/user_config" 2>/dev/null; then
+if [ -d "${build_dir:?}/config" ]; then
+	if ! mv "${build_dir:?}/config" "${build_dir:?}/user_config" 2>/dev/null; then
 		cmn::task::fail
 		cmn::step::fail
 		exit 14
@@ -109,21 +109,21 @@ if [ -d "${build_dir}/config" ]; then
 fi
 
 # Copy default config:
-if ! mv "${build_dir}/logstash-${version}/"* "${build_dir}/"; then
+if ! mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/"; then
 	cmn::task::fail
 	cmn::step::fail
 	exit 15
 fi
 
-if ! rmdir "${build_dir}/logstash-${version}"; then
+if ! rmdir "${build_dir:?}/logstash-${version}"; then
 	cmn::task::fail
 	cmn::step::fail
 	exit 16
 fi
 
 # Put user-provided config back in place:
-if [ -d "${build_dir}/user_config" ]; then
-	if ! mv "${build_dir}/user_config/"* "${build_dir}/config/" 2>/dev/null
+if [ -d "${build_dir:?}/user_config" ]; then
+	if ! mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/" 2>/dev/null
 	then
 		cmn::task::fail
 		cmn::step::fail
@@ -131,7 +131,7 @@ if [ -d "${build_dir}/user_config" ]; then
 	fi
 
 	# Don't exit if this one fails:
-	rmdir "${build_dir}/user_config" 2>/dev/null
+	rmdir "${build_dir:?}/user_config" 2>/dev/null
 fi
 cmn::task::finish
 
@@ -141,7 +141,7 @@ cmn::step::finish
 
 cmn::step::start "Building Environment"
 
-export PATH="${build_dir}/bin:${PATH}"
+export PATH="${build_dir:?}/bin:${PATH}"
 
 cmn::step::finish
 
@@ -185,7 +185,7 @@ cmn::step::finish
 cmn::step::start "Cleaning up"
 
 cmn::task::start "Removing temporary files"
-rm --recursive --force "${tmp_dir}"
+rm --recursive --force "${tmp_dir:?}"
 cmn::task::finish
 
 cmn::step::finish
