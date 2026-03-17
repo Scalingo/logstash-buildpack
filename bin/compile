@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
-# Don't try to shellcheck cmnlib.sh
-# shellcheck disable=SC1091
-source "$( cd -P "$( dirname "${0}" )" && pwd )/../cmnlib.sh"
+source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
 
 cmn::main::start "${0}" "${1}" "${2}" "${3}"
 
@@ -32,61 +30,54 @@ cmn::step::start "Installing Logstash ${version}"
 # Download hash file:
 cmn::task::start "Downloading checksum"
 # Remove previous hash files:
-rm --recursive --force "${cache_dir:?}"/*.tar.gz.sha512
+rm --recursive --force "${cache_dir:?}"/logstash*.tar.gz.sha512
 
-if ! cmn::file::download "${hash_url}" "${hash_file}"; then
-	cmn::task::fail
-	cmn::step::fail
-	exit 10
-fi
+cmn::file::download "${hash_url}" "${hash_file}" \
+	|| cmn::task::fail "${?}" <<- EOM
+		Unable to download checksum file.
+		Aborting.
+	EOM
 cmn::task::finish
 
 if [ ! -f "${cache_file}" ]; then
 	# Remove archive from cache, since they are probably for another version:
 	cmn::task::start "Cleaning cache"
-	rm --recursive --force "${cache_dir:?}"/*.tar.gz
+	rm --recursive --force "${cache_dir:?}"/logstash*.tar.gz
 	cmn::task::finish
 
 	# Download appropriate version:
 	cmn::task::start "Downloading archive"
-	if ! cmn::file::download "${file_url}" "${cache_file}"; then
-		cmn::task::fail
-		cmn::step::fail
-		exit 11
-	fi
+	cmn::file::download "${file_url}" "${cache_file}" \
+		|| cmn::task::fail "${?}" <<-EOM
+			Unable to download Logstash archive.
+			Aborting.
+		EOM
 	cmn::task::finish
 else
 	cmn::output::info "Found matching file in cache."
 fi
 
 cmn::task::start "Checking archive validity"
-if ! cmn::file::check_checksum "${cache_file}" "${hash_file}"; then
-	cmn::task::fail
-	cmn::output::err <<- EOM
-		Unable to check archive validity.
-		I'm now removing the file from the cache to force
-		a new download during the next deployment attempt.
-	EOM
+cmn::file::validate_checksum "${cache_file}" "${hash_file}" \
+	|| {
+		# File in cache does not seem valid,
+		# remove it so a future run can be successful
+		rm --force "${cache_file}"
+		rm --force "${hash_file}"
 
-	# File in cache does not seem valid,
-	# remove it so a future run can be successful
-	rm --force "${cache_file}"
-	rm --force "${hash_file}"
-	cmn::step::fail
-	exit 12
-fi
+		cmn::task::fail 2 <<-EOM
+			Unable to check archive validity.
+			Files in cache have been removed to force a new download during the
+			next deployment attempt.
+			Aborting.
+		EOM
+	}
 cmn::task::finish
 
 # From this point we have a valid file in cache.
 
 cmn::task::start "Extracting"
-if ! tar --extract --file="${cache_file}" --directory="${build_dir:?}" \
-	2>/dev/null
-then
-	cmn::task::fail
-	cmn::step::fail
-	exit 13
-fi
+tar --extract --file="${cache_file}" --directory="${build_dir:?}" 2>/dev/null
 cmn::task::finish
 
 cmn::task::start "Configuring"
@@ -101,49 +92,28 @@ cmn::task::start "Configuring"
 
 # Put user-provided config aside:
 if [ -d "${build_dir:?}/config" ]; then
-	if ! mv "${build_dir:?}/config" "${build_dir:?}/user_config" 2>/dev/null; then
-		cmn::task::fail
-		cmn::step::fail
-		exit 14
-	fi
+	mv "${build_dir:?}/config" "${build_dir:?}/user_config" 2>/dev/null
 fi
 
 # Copy default config:
-if ! mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/"; then
-	cmn::task::fail
-	cmn::step::fail
-	exit 15
-fi
+mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/" 2>/dev/null
 
-if ! rmdir "${build_dir:?}/logstash-${version}"; then
-	cmn::task::fail
-	cmn::step::fail
-	exit 16
-fi
+rmdir "${build_dir:?}/logstash-${version}" 2>/dev/null
 
 # Put user-provided config back in place:
 if [ -d "${build_dir:?}/user_config" ]; then
-	if ! mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/" 2>/dev/null
-	then
-		cmn::task::fail
-		cmn::step::fail
-		exit 17
-	fi
+	mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/" 2>/dev/null
 
 	# Don't exit if this one fails:
-	rmdir "${build_dir:?}/user_config" 2>/dev/null
+	rmdir "${build_dir:?}/user_config" 2>/dev/null || true
 fi
 cmn::task::finish
-
-cmn::step::finish
 
 # -----------------------------------------------------------------------------
 
 cmn::step::start "Building Environment"
 
 export PATH="${build_dir:?}/bin:${PATH}"
-
-cmn::step::finish
 
 # -----------------------------------------------------------------------------
 
@@ -156,39 +126,33 @@ plugins="${LOGSTASH_PLUGINS//,/ }"
 
 # Make sure "logstash-output-opensearch" is installed:
 cmn::task::start "Installing plugin logstash-output-opensearch"
-if ! logstash-plugin install "logstash-output-opensearch" >/dev/null 2>&1
-then
-	cmn::task::fail
-	cmn::step::fail
-	exit 20
-fi
+logstash-plugin install "logstash-output-opensearch" >/dev/null 2>&1 \
+	|| cmn::task::fail "${?}" <<-EOM
+		Unable to install plugin: logstash-output-opensearch.
+		Aborting.
+	EOM
 cmn::task::finish
 
 # (! Don't quote $plugins)
 for plugin in ${plugins}; do
 	if [ "${plugin}" != "logstash-output-opensearch" ]; then
 		cmn::task::start "Installing plugin ${plugin}"
-		if ! logstash-plugin install "${plugin}" >/dev/null 2>&1
-		then
-			cmn::task::fail
-			cmn::step::fail
-			exit 21
-		fi
+		logstash-plugin install "${plugin}" >/dev/null 2>&1 \
+			|| cmn::task::fail "${?}" <<-EOM
+				Unable to install plugin: ${plugin}.
+				Aborting.
+			EOM
 		cmn::task::finish
 	fi
 done
-
-cmn::step::finish
 
 # -----------------------------------------------------------------------------
 
 cmn::step::start "Cleaning up"
 
 cmn::task::start "Removing temporary files"
-rm --recursive --force "${tmp_dir:?}"
+rm --recursive --force "${tmp_dir:?}" >/dev/null 2>&1 || true
 cmn::task::finish
-
-cmn::step::finish
 
 
 cmn::main::finish
