@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval $(echo $ELASTICSEARCH_URL | sed -r 's/(https?:\/\/)(([^:]*):([^:]*)@){0,1}(.*)/url=\1\5 \nuser=\3 \npass=\4/')
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-6.8.21}
+LOGSTASH_VERSION=${LOGSTASH_VERSION:-9.2.4}
 APP_PATH=$(dirname $(readlink -f $0))/../
 
 export ELASTICSEARCH_HOST=$url
