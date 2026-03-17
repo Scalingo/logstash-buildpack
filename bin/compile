@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
+# shellcheck source=vendor/cmnlib.sh
 source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
 
 cmn::main::start "${0}" "${1}" "${2}" "${3}"
@@ -77,7 +78,7 @@ cmn::task::finish
 # From this point we have a valid file in cache.
 
 cmn::task::start "Extracting"
-tar --extract --file="${cache_file}" --directory="${build_dir:?}" 2>/dev/null
+tar --extract --file="${cache_file}" --directory="${build_dir:?}"
 cmn::task::finish
 
 cmn::task::start "Configuring"
@@ -92,19 +93,20 @@ cmn::task::start "Configuring"
 
 # Put user-provided config aside:
 if [ -d "${build_dir:?}/config" ]; then
-	mv "${build_dir:?}/config" "${build_dir:?}/user_config" 2>/dev/null
+	mv "${build_dir:?}/config" "${build_dir:?}/user_config"
 fi
 
 # Copy default config:
-mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/" 2>/dev/null
+mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/"
 
-rmdir "${build_dir:?}/logstash-${version}" 2>/dev/null
+# Don't exit if this fails
+rmdir "${build_dir:?}/logstash-${version}" 2>/dev/null || true
 
 # Put user-provided config back in place:
 if [ -d "${build_dir:?}/user_config" ]; then
-	mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/" 2>/dev/null
+	mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/"
 
-	# Don't exit if this one fails:
+	# Don't exit if this fails
 	rmdir "${build_dir:?}/user_config" 2>/dev/null || true
 fi
 cmn::task::finish
