@@ -5,5 +5,5 @@ cat << EOF
 config_vars:
   PATH: "/app/bin:/usr/local/bin:/usr/bin:/bin"
 default_process_types:
-  web: /app/bin/logstash --path.settings=/app/config
+  web: /app/bin/logstash --path.config=/app/logstash.conf --path.settings=/app/config
 EOF
