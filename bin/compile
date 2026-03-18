@@ -1,56 +1,191 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
-BUILD_DIR=$1
+# shellcheck source=vendor/cmnlib.sh
+source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
 
-indent() {
-  sed 's/^/       /'
-}
+cmn::main::start "${0}" "${1}" "${2}" "${3}"
 
-LOGSTASH_VERSION=${LOGSTASH_VERSION:-9.2.4}
+# -----------------------------------------------------------------------------
 
-BUILDPACK_PATH=$(dirname $(readlink -f $0))/../
+# shellcheck source=VERSIONS
+source "${buildpack_dir:?}/VERSIONS"
+version="${LOGSTASH_VERSION:-"${LOGSTASH_DEFAULT_VERSION}"}"
 
-echo "Downloading Logstash version $LOGSTASH_VERSION" | indent
+archive="logstash-${version}.tar.gz"
 
-if [ ${LOGSTASH_VERSION:0:1} = "6" ]
-then
-  URL=https://artifacts.elastic.co/downloads/logstash/logstash-$LOGSTASH_VERSION.tar.gz
+file_url="https://artifacts.elastic.co/downloads/logstash/logstash-oss-${version}-linux-x86_64.tar.gz"
+
+# If major version is 6.x, then the URL is a bit different:
+if [ "${version:0:1}" == "6" ]; then
+	file_url="https://artifacts.elastic.co/downloads/logstash/logstash-${version}.tar.gz"
+fi
+
+hash_url="${file_url}.sha512"
+
+cache_file="${cache_dir:?}/${archive}"
+hash_file="${tmp_dir:?}/${archive}.sha512"
+
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Installing Logstash ${version}"
+
+# We always check archive validity using a freshly downloaded checksum to
+# detect/prevent immutability issues (i.e. cases where upstream replaces the
+# archive at the same URL/same version number)
+# So let's download the checksum:
+cmn::task::start "Downloading checksum"
+cmn::file::download "${hash_url}" "${hash_file}" \
+	|| cmn::task::fail "${?}" <<-EOM
+		Unable to download checksum file.
+		Aborting.
+	EOM
+cmn::task::finish
+
+if [[ ! -f "${cache_file}" ]]; then
+	# The archive doesn't exist in the cache.
+
+	# Remove any existing cached archive, as they are probably for another
+	# version:
+	cmn::task::start "Cleaning cache"
+	rm --recursive --force "${cache_dir:?}"/logstash*.tar.gz
+	cmn::task::finish
+
+	# Download appropriate version:
+	cmn::task::start "Downloading archive"
+	cmn::file::download "${file_url}" "${cache_file}" \
+		|| cmn::task::fail "${?}" <<-EOM
+			Unable to download Logstash archive.
+			Aborting.
+		EOM
+	cmn::task::finish
 else
-  URL=https://artifacts.elastic.co/downloads/logstash/logstash-oss-$LOGSTASH_VERSION-linux-x86_64.tar.gz
-fi
-curl $URL -L --silent -o /tmp/logstash.tar.gz
+	# The archive is in cache.
 
-echo "Extracting logstash" | indent
-tar -xf /tmp/logstash.tar.gz -C $BUILD_DIR
-
-# Put user-provided config files aside:
-if [ -d "${BUILD_DIR}/config" ]; then
-  mv "${BUILD_DIR}/config" "${BUILD_DIR}/user_config" 2> /dev/null
+	cmn::output::info "Found matching file in cache."
 fi
 
-# Copy default config files:
-mv "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}/"* "${BUILD_DIR}/"
-rmdir "${BUILD_DIR}/logstash-${LOGSTASH_VERSION}"
+# From this point, we have an archive in cache.
 
-# Put back user-provided config:
-if [ -d "${BUILD_DIR}/user_config" ]; then
-  mv "${BUILD_DIR}/user_config/"* "${BUILD_DIR}/config/" 2> /dev/null
-  rmdir "${BUILD_DIR}/user_config" 2> /dev/null
+# We always check the archive validity to prevent cache corruption and other
+# issues.
+cmn::task::start "Checking archive validity"
+cmn::file::validate_checksum "${cache_file}" "${hash_file}" \
+	|| {
+		# File in cache does not seem valid,
+		# remove it so a future run can be successful
+		rm --force "${cache_file}"
+
+		cmn::task::fail 2 <<-EOM
+			The checksum for the archive file in the cache doesn't match what's
+			expected.
+
+			Here are the most common causes:
+
+			- The archive file in the cache is corrupt. This can
+			  unfortunately happen, but has no strong consequences. Triggering
+			  a new deployment should fix the issue.
+
+			- A networking issue occurred, causing the downloaded checksum
+			  file to be incomplete or corrupt. Triggering a new deployment
+			  should force the platform to download the archive and the
+			  checksum again, and the deployment should pass.
+
+			- Upstream replaced the archive and its checksum, resulting in the
+			  same version number having a different checksum.
+			  This could mean a malicious threat tampered the source archive
+			  and its checksum.
+			  Please check upstream for a potential explanation and make sure
+			  it's still trustable.
+
+			In all cases, the cached archive has been removed to force a new
+			download during the next deployment attempt.
+
+			Aborting.
+		EOM
+	}
+cmn::task::finish
+
+# From this point we have a valid file in cache.
+
+cmn::task::start "Extracting"
+tar --extract --file="${cache_file}" --directory="${build_dir:?}"
+cmn::task::finish
+
+cmn::task::start "Configuring"
+# Users can provide their own configuration files in the `config` directory.
+# But we also want to bring our defaults!
+# Simply copying our files in the `config` directory could overwrite the
+# user-provided config, and that's not what we want.
+# Consequently, user-provided files must first be put aside, so we can copy
+# ours.
+# The user-provided files are then copied back, which makes sure user-provided
+# config takes precedence over our defaults.
+
+# Put user-provided config aside:
+if [ -d "${build_dir:?}/config" ]; then
+	mv "${build_dir:?}/config" "${build_dir:?}/user_config"
 fi
 
-export PATH="${PATH}:${BUILD_DIR}/bin"
+# Copy default config:
+mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/"
 
+# Don't exit if this fails
+rmdir "${build_dir:?}/logstash-${version}" 2>/dev/null || true
 
-echo "Installing plugins" | indent
+# Put user-provided config back in place:
+if [ -d "${build_dir:?}/user_config" ]; then
+	mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/"
 
-# Always install logstash-output-opensearch
-echo "Installing plugin logstash-output-opensearch" | indent
-logstash-plugin install "logstash-output-opensearch"
+	# Don't exit if this fails
+	rmdir "${build_dir:?}/user_config" 2>/dev/null || true
+fi
+cmn::task::finish
 
-# Install other plugins:
-for plugin in $(echo $LOGSTASH_PLUGINS | sed "s/,/ /g") ; do
-  echo "Installing plugin $plugin" | indent
-  logstash-plugin install "${plugin}" | indent
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Building Environment"
+
+export PATH="${build_dir:?}/bin:${PATH}"
+
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Installing Plugins"
+# Make sure LOGSTASH_PLUGINS is defined:
+LOGSTASH_PLUGINS="${LOGSTASH_PLUGINS:-""}"
+
+# Replace ',' with ' ':
+plugins="${LOGSTASH_PLUGINS//,/ }"
+
+# Make sure "logstash-output-opensearch" is installed:
+cmn::task::start "Installing plugin logstash-output-opensearch"
+logstash-plugin install "logstash-output-opensearch" >/dev/null 2>&1 \
+	|| cmn::task::fail "${?}" <<-EOM
+		Unable to install plugin: logstash-output-opensearch.
+		Aborting.
+	EOM
+cmn::task::finish
+
+# (! Don't quote $plugins)
+for plugin in ${plugins}; do
+	if [ "${plugin}" != "logstash-output-opensearch" ]; then
+		cmn::task::start "Installing plugin ${plugin}"
+		logstash-plugin install "${plugin}" >/dev/null 2>&1 \
+			|| cmn::task::fail "${?}" <<-EOM
+				Unable to install plugin: ${plugin}.
+				Aborting.
+			EOM
+		cmn::task::finish
+	fi
 done
 
-echo "Done" | indent
+# -----------------------------------------------------------------------------
+
+cmn::step::start "Cleaning up"
+
+cmn::task::start "Removing temporary files"
+rm --recursive --force "${tmp_dir:?}" >/dev/null 2>&1 || true
+cmn::task::finish
+
+
+cmn::main::finish
