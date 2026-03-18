@@ -130,14 +130,21 @@ fi
 # Copy default config:
 mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/"
 
-# Don't exit if this fails
+# Remove useless files from default config
+# Don't exit if one of these fails:
+rm --force "${build_dir:?}/config/logstash-sample.conf" || true
+rm --force "${build_dir:?}/config/logstash.yml" || true
+rm --force "${build_dir:?}/config/pipelines.yml" || true
+rm --force "${build_dir:?}/config/jvm.options" || true
+rm --force "${build_dir:?}/config/startup.options" || true
+
 rmdir "${build_dir:?}/logstash-${version}" 2>/dev/null || true
 
 # Put user-provided config back in place:
 if [ -d "${build_dir:?}/user_config" ]; then
 	mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/"
 
-	# Don't exit if this fails
+	# Don't exit if one of these fails:
 	rmdir "${build_dir:?}/user_config" 2>/dev/null || true
 fi
 cmn::task::finish

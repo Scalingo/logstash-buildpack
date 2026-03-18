@@ -1,8 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-if [ -f $1/logstash.conf ] ; then
-  echo "Logstash"
-  exit 0
-fi
-
-exit 1
+echo "Logstash"
+exit 0
