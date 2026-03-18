@@ -135,7 +135,7 @@ mv "${build_dir:?}/logstash-${version}/"* "${build_dir:?}/"
 rm --force "${build_dir:?}/config/logstash-sample.conf" || true
 rm --force "${build_dir:?}/config/logstash.yml" || true
 rm --force "${build_dir:?}/config/pipelines.yml" || true
-rm --force "${build_dir:?}/config/jvm.options" || true
+# rm --force "${build_dir:?}/config/jvm.options" || true
 rm --force "${build_dir:?}/config/startup.options" || true
 
 rmdir "${build_dir:?}/logstash-${version}" 2>/dev/null || true
