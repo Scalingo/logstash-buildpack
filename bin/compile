@@ -86,7 +86,7 @@ cmn::file::validate_checksum "${cache_file}" "${hash_file}" \
 			  unfortunately happen, but has no strong consequences. Triggering
 			  a new deployment should fix the issue.
 
-			- A networking issue occured, causing the downloaded checksum
+			- A networking issue occurred, causing the downloaded checksum
 			  file to be incomplete or corrupt. Triggering a new deployment
 			  should force the platform to download the archive and the
 			  checksum again, and the deployment should pass.
