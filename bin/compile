@@ -36,7 +36,7 @@ cmn::step::start "Installing Logstash ${version}"
 # So let's download the checksum:
 cmn::task::start "Downloading checksum"
 cmn::file::download "${hash_url}" "${hash_file}" \
-	|| cmn::task::fail "${?}" <<-EOM
+	|| cmn::main::fail "${?}" <<-EOM
 		Unable to download checksum file.
 		Aborting.
 	EOM
@@ -54,7 +54,7 @@ if [[ ! -f "${cache_file}" ]]; then
 	# Download appropriate version:
 	cmn::task::start "Downloading archive"
 	cmn::file::download "${file_url}" "${cache_file}" \
-		|| cmn::task::fail "${?}" <<-EOM
+		|| cmn::main::fail "${?}" <<-EOM
 			Unable to download Logstash archive.
 			Aborting.
 		EOM
@@ -76,7 +76,7 @@ cmn::file::validate_checksum "${cache_file}" "${hash_file}" \
 		# remove it so a future run can be successful
 		rm --force "${cache_file}"
 
-		cmn::task::fail 2 <<-EOM
+		cmn::main::fail 2 <<-EOM
 			The checksum for the archive file in the cache doesn't match what's
 			expected.
 
@@ -166,7 +166,7 @@ plugins="${LOGSTASH_PLUGINS//,/ }"
 # Make sure "logstash-output-opensearch" is installed:
 cmn::task::start "Installing plugin logstash-output-opensearch"
 logstash-plugin install "logstash-output-opensearch" >/dev/null 2>&1 \
-	|| cmn::task::fail "${?}" <<-EOM
+	|| cmn::main::fail "${?}" <<-EOM
 		Unable to install plugin: logstash-output-opensearch.
 		Aborting.
 	EOM
@@ -177,7 +177,7 @@ for plugin in ${plugins}; do
 	if [ "${plugin}" != "logstash-output-opensearch" ]; then
 		cmn::task::start "Installing plugin ${plugin}"
 		logstash-plugin install "${plugin}" >/dev/null 2>&1 \
-			|| cmn::task::fail "${?}" <<-EOM
+			|| cmn::main::fail "${?}" <<-EOM
 				Unable to install plugin: ${plugin}.
 				Aborting.
 			EOM
