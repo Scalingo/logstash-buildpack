@@ -31,4 +31,4 @@ concerns or external constraints.
 
 [`VERSIONS`]: VERSIONS?plain=1#L3
 
-[Ŀogstash]: https://www.elastic.co/logstash
+[Logstash]: https://www.elastic.co/logstash
