@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # usage: bin/compile <build_dir> <cache_dir> <env_dir>
 
+cmnlib="$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
 # shellcheck source=vendor/cmnlib.sh
-source "$( readlink -f "$( dirname "${0}" )/../vendor/cmnlib.sh" )"
+source "${cmnlib}"
 
 cmn::main::start "${0}" "${1}" "${2}" "${3}"
 
@@ -17,7 +18,7 @@ archive="logstash-${version}.tar.gz"
 file_url="https://artifacts.elastic.co/downloads/logstash/logstash-oss-${version}-linux-x86_64.tar.gz"
 
 # If major version is 6.x, then the URL is a bit different:
-if [ "${version:0:1}" == "6" ]; then
+if [[ "${version:0:1}" == "6" ]]; then
 	file_url="https://artifacts.elastic.co/downloads/logstash/logstash-${version}.tar.gz"
 fi
 
@@ -25,6 +26,8 @@ hash_url="${file_url}.sha512"
 
 cache_file="${cache_dir:?}/${archive}"
 hash_file="${tmp_dir:?}/${archive}.sha512"
+
+build_log="${tmp_dir:?}/build.log"
 
 # -----------------------------------------------------------------------------
 
@@ -35,11 +38,14 @@ cmn::step::start "Installing Logstash ${version}"
 # archive at the same URL/same version number)
 # So let's download the checksum:
 cmn::task::start "Downloading checksum"
-cmn::file::download "${hash_url}" "${hash_file}" \
-	|| cmn::main::fail "${?}" <<-EOM
+
+# shellcheck disable=2310
+if ! cmn::file::download "${hash_url}" "${hash_file}"; then
+	cmn::main::fail "${?}" <<-EOM
 		Unable to download checksum file.
 		Aborting.
 	EOM
+fi
 cmn::task::finish
 
 if [[ ! -f "${cache_file}" ]]; then
@@ -53,11 +59,13 @@ if [[ ! -f "${cache_file}" ]]; then
 
 	# Download appropriate version:
 	cmn::task::start "Downloading archive"
-	cmn::file::download "${file_url}" "${cache_file}" \
-		|| cmn::main::fail "${?}" <<-EOM
+	# shellcheck disable=SC2310
+	if ! cmn::file::download "${file_url}" "${cache_file}"; then
+		cmn::main::fail "${?}" <<-EOM
 			Unable to download Logstash archive.
 			Aborting.
 		EOM
+	fi
 	cmn::task::finish
 else
 	# The archive is in cache.
@@ -70,40 +78,39 @@ fi
 # We always check the archive validity to prevent cache corruption and other
 # issues.
 cmn::task::start "Checking archive validity"
-cmn::file::validate_checksum "${cache_file}" "${hash_file}" \
-	|| {
-		# File in cache does not seem valid,
-		# remove it so a future run can be successful
-		rm --force "${cache_file}"
+# shellcheck disable=SC2310
+if ! cmn::file::validate_checksum "${cache_file}" "${hash_file}"; then
+	# File in cache does not seem valid,
+	# remove it so a future run can be successful
+	rm --force "${cache_file}"
 
-		cmn::main::fail 2 <<-EOM
-			The checksum for the archive file in the cache doesn't match what's
-			expected.
+	cmn::main::fail 2 <<-EOM
+		The checksum for the archive file in the cache doesn't match what's
+		expected.
 
-			Here are the most common causes:
+		Here are the most common causes:
 
-			- The archive file in the cache is corrupt. This can
-			  unfortunately happen, but has no strong consequences. Triggering
-			  a new deployment should fix the issue.
+		- The archive file in the cache is corrupt. This can unfortunately
+		  happen, but has no strong consequences. Triggering a new deployment
+		  should fix the issue.
 
-			- A networking issue occurred, causing the downloaded checksum
-			  file to be incomplete or corrupt. Triggering a new deployment
-			  should force the platform to download the archive and the
-			  checksum again, and the deployment should pass.
+		- A networking issue occurred, causing the downloaded checksum file to
+		  be incomplete or corrupt. Triggering a new deployment should force
+		  the platform to download the archive and the checksum again, and the
+		  deployment should pass.
 
-			- Upstream replaced the archive and its checksum, resulting in the
-			  same version number having a different checksum.
-			  This could mean a malicious threat tampered the source archive
-			  and its checksum.
-			  Please check upstream for a potential explanation and make sure
-			  it's still trustable.
+		- Upstream replaced the archive and its checksum, resulting in the same
+		  version number having a different checksum. This could mean a
+		  malicious threat tampered the source archive and its checksum. Please
+		  check upstream for a potential explanation and make sure it's still 
+		  trustable.
 
-			In all cases, the cached archive has been removed to force a new
-			download during the next deployment attempt.
+		In all cases, the cached archive has been removed to force a new
+		download during the next deployment attempt.
 
-			Aborting.
-		EOM
-	}
+		Aborting.
+	EOM
+fi
 cmn::task::finish
 
 # From this point we have a valid file in cache.
@@ -123,7 +130,7 @@ cmn::task::start "Configuring"
 # config takes precedence over our defaults.
 
 # Put user-provided config aside:
-if [ -d "${build_dir:?}/config" ]; then
+if [[ -d "${build_dir:?}/config" ]]; then
 	mv "${build_dir:?}/config" "${build_dir:?}/user_config"
 fi
 
@@ -140,7 +147,7 @@ rm --force "${build_dir:?}/config/pipelines.yml" || true
 rm --force "${build_dir:?}/config/startup.options" || true
 
 # Put user-provided config back in place:
-if [ -d "${build_dir:?}/user_config" ]; then
+if [[ -d "${build_dir:?}/user_config" ]]; then
 	mv "${build_dir:?}/user_config/"* "${build_dir:?}/config/"
 
 	# Don't exit if this fails:
@@ -158,30 +165,36 @@ export PATH="${build_dir:?}/bin:${PATH}"
 
 cmn::step::start "Installing Plugins"
 # Make sure LOGSTASH_PLUGINS is defined:
-LOGSTASH_PLUGINS="${LOGSTASH_PLUGINS:-""}"
+plugins="${LOGSTASH_PLUGINS:-""}"
 
 # Replace ',' with ' ':
-plugins="${LOGSTASH_PLUGINS//,/ }"
+plugins="${plugins//,/ }"
 
 # Make sure "logstash-output-opensearch" is installed:
-cmn::task::start "Installing plugin logstash-output-opensearch"
-logstash-plugin install "logstash-output-opensearch" >/dev/null 2>&1 \
-	|| cmn::main::fail "${?}" <<-EOM
-		Unable to install plugin: logstash-output-opensearch.
-		Aborting.
-	EOM
-cmn::task::finish
+plugins="logstash-output-opensearch ${plugins}"
+
+# Array containing already installed plugins:
+seen_plugins=()
 
 # (! Don't quote $plugins)
 for plugin in ${plugins}; do
-	if [ "${plugin}" != "logstash-output-opensearch" ]; then
+	if [[ ! "${seen_plugins[*]}" =~ ${plugin} ]]; then
 		cmn::task::start "Installing plugin ${plugin}"
-		logstash-plugin install "${plugin}" >/dev/null 2>&1 \
-			|| cmn::main::fail "${?}" <<-EOM
+
+		if ! logstash-plugin install "${plugin}" > "${build_log}" 2>&1; then
+			cmn::task::fail
+			cmn::output::err < "${build_log}"
+			cmn::main::fail 3 <<-EOM
 				Unable to install plugin: ${plugin}.
 				Aborting.
 			EOM
+		fi
+
+		seen_plugins+=("${plugin}")
+
 		cmn::task::finish
+
+	# else the plugin is already installed.
 	fi
 done
 
